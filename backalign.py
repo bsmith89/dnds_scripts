@@ -23,8 +23,8 @@ def back_align_all(nucl_recs, aa_recs):
         aa_rec = get_seq_record(ident = nucl_rec.id, seq_recs = aa_recs)
         try:
             nucl_rec.seq = back_align(nucl_rec, aa_rec)
-        except ValueError:
-            sys.stderr.write("WARNING: nucl_seq '%s' and aa_seq '%s' are not of matching lengths!\n%d and %d positions long respectively (w/out gaps)\nSequences removed from analysis.\n" % (nucl_rec.id, aa_rec.id, len(nucl_rec.seq.ungap(gap = '-')), len(aa_rec.seq.ungap(gap = '-'))))
+        except ValueError as back_align_error:
+            sys.stderr.write("WARNING: nucl_seq '%s' and aa_seq '%s' could not be back-aligned:\n%s\nSequences removed from analysis.\n" % (nucl_rec.id, aa_rec.id, str(back_align_error)))
             nucl_rec.seq = Bio.Seq.Seq('-', Bio.Alphabet.generic_dna)
         else:
             out_nucl_recs += [nucl_rec]
@@ -32,24 +32,32 @@ def back_align_all(nucl_recs, aa_recs):
 
 def codons(nucl_seq):
     """Produces a codon iterator from a nucleotide sequence."""
-    assert len(nucl_seq) % 3 == 0
     for i in range(len(nucl_seq) / 3):
         yield nucl_seq[i * 3:(i * 3) + 3]
 
 def back_align(nucl_rec, aa_rec):
-    """Takes a aligned AAs and matches nucleotides to them."""
+    """Takes a aligned AAs and matches nucleotides to them.
+    
+    TODO: deal with final stop codons (or lack there of).
+
+    """
     nucl_seq = nucl_rec.seq.ungap(gap = '-')
     aa_seq = aa_rec.seq
+    trans_nucl = nucl_seq.translate()
+    aa_no_gaps = aa_seq.ungap(gap = '-')
+    # remove stop codons from the end of sequences that have them.
+    if trans_nucl[-1] == "*":
+        nucl_seq = nucl_seq[:-3]
+        trans_nucl = nucl_seq.translate()
+    if not str(trans_nucl) == str(aa_no_gaps):
+        raise ValueError("Nucleotide sequence does not translate to AA-sequence:\nAA (w/out gaps) (%d):\n%s\nTrans-Nucl (%d):\n%s\n" % (len(aa_no_gaps), str(aa_no_gaps), len(trans_nucl), str(trans_nucl)))
     out_seq = Bio.Seq.Seq("", alphabet = Bio.Alphabet.generic_dna)
-    if not (len(nucl_seq) - 3) / 3.0 == len(aa_seq.ungap(gap = '-')):
-        raise ValueError('Sequence lengths do not match.')
     codon_gen = codons(nucl_seq)
     for aa in aa_seq:
         if aa is not "-":
             out_seq += codon_gen.next()
         else:
             out_seq += "---"
-    assert len(out_seq) / 3.0 == len(aa_seq)
     return out_seq
 
 def main():
