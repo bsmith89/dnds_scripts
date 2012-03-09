@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Correctly aligns nucleotide sequences (codon-wise).
 
 Takes AA-alignments with their associated nucleotide sequences and

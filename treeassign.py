@@ -14,24 +14,31 @@ def recurse_label(clade, target, design, labels):
     """
     if clade.is_terminal(): # if it's a leaf
         try:
-            if design[clade.name] is target:
+            if design[clade.name] == target:
                 return True
             else:
+                sys.stderr.write("'%s' is not in '%s' but rather in '%s'\n" % (clade.name, target, design[clade.name]))
                 return False
         # If the node is not in the design mapping ignore it
         # and don't consider it in marking higher level nodes.
         except KeyError:
-            return None # or should it be True? nothing at all?
+            return None
     else: # if it's a node
-        all_in_group = True
+        all_in_group = None
         for subclade in clade.clades:
-            if recurse_label(subclade, target, design, labels) is False:
+            subclade_in_group = recurse_label(subclade, target, design, labels)
+            if subclade_in_group is False:
+                sys.stderr.write("Not all in %s are in '%s'\n" % (str(subclade.get_terminals()), target))
                 all_in_group = False
+            elif subclade_in_group is True and all_in_group is not False:
+                all_in_group = True
         if all_in_group is False:
             return False
-        else:
+        elif all_in_group is True:
             label_node(clade, labels[target])
             return True
+        else:
+            return None
 
 def label_leaf(leaf, label):
     leaf.name += " %s" % label
