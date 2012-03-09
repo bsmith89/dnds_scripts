@@ -16,7 +16,7 @@ import Bio
 from Bio import Phylo
 import sys
 
-def recurse_label(clade, target, design, labels):
+def recurse_label_nodes(clade, target, design, labels):
     """Label nodes and return True if all children are of Group.
 
     """
@@ -34,7 +34,7 @@ def recurse_label(clade, target, design, labels):
     else: # if it's a node
         all_in_group = None
         for subclade in clade.clades:
-            subclade_in_group = recurse_label(subclade, target, design, labels)
+            subclade_in_group = recurse_label_nodes(subclade, target, design, labels)
             if subclade_in_group is False:
                 sys.stderr.write("Not all in %s are in '%s'\n" % (str(subclade.get_terminals()), target))
                 all_in_group = False
@@ -47,6 +47,17 @@ def recurse_label(clade, target, design, labels):
             return True
         else:
             return None
+
+def label_all(tree, design, labels):
+    for grouping in labels:
+        recurse_label_nodes(tree.clade, grouping, design, labels)
+        # Because labeling directly changes the name, I can't label
+        # leaves before I'm done with all of the nodes.
+    for leaf in tree.get_terminals():
+        try:
+            label_leaf(leaf, labels[design[leaf.name]])
+        except KeyError:
+            continue
 
 def label_leaf(leaf, label):
     """Label the given leaf with the provided label string.
@@ -70,15 +81,7 @@ def label_node(node, label):
     """
     node.confidence = " %s" % label
 
-def main():
-    design_path = sys.argv[1]
-    design_file = open(design_path)
-    try:
-        labels_path = sys.argv[2]
-        labels_file = open(labels_path)
-    except IndexError:
-        labels_file = None
-    tree = Bio.Phylo.read(sys.stdin, 'newick')
+def parse_design_and_labels(design_file, labels_file = None):
     design = {}
     labels = {}
     for mapping in design_file:
@@ -90,20 +93,24 @@ def main():
         for mapping in labels_file:
             grouping, label = mapping.split()
             labels[grouping] = label
-    # Consider combining these two labeling steps (leaves and nodes)
-    # into a single function outside of main().
-    #
-    # Now actually do the labeling...
-    for grouping in labels:
-        recurse_label(tree.clade, grouping, design, labels)
-    # Because labeling directly changes the name, I can't label
-    # leaves before I'm done with all of the nodes.
-    for leaf in tree.get_terminals():
-        try:
-            label_leaf(leaf, labels[design[leaf.name]])
-        except KeyError:
-            continue
-    Bio.Phylo.write(tree, sys.stdout, 'newick', format_confidence = '%s')
+    return design, labels
+
+
+def write_tree(tree, out_file):
+    Bio.Phylo.write(tree, out_file, 'newick', format_confidence = '%s')
+
+def main():
+    design_path = sys.argv[1]
+    design_file = open(design_path)
+    try:
+        labels_path = sys.argv[2]
+        labels_file = open(labels_path)
+    except IndexError:
+        labels_file = None
+    tree = Bio.Phylo.read(sys.stdin, 'newick')
+    design, labels = parse_design_and_labels(design_file, labels_file)
+    label_all(tree, design, labels)
+    write_tree(tree, sys.stdout)
 
 if __name__ == '__main__':
     main()

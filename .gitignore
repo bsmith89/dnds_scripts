@@ -1,0 +1,12 @@
+# Various Output Files #
+########################
+test_data/
+
+# Non-source Code #
+###################
+*.pyc
+
+# Eclipse Files Config Files#
+#############################
+.project
+.pydevproject
