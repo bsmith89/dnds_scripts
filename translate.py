@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""Take fasta-form nucleotide seqs to stdin, print AA-seqs to stdout.
+
+"""
 
 from Bio import SeqIO
 import sys

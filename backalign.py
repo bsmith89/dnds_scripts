@@ -4,8 +4,7 @@
 Takes AA-alignments with their associated nucleotide sequences and
 outputs the aligned nucleotides.
 
-TODO: Figure out how to deal with AA seqs that aren't the correct
-length.
+TODO: Comprehensive tests of accuracy (although I *think* it's right).
 """
 import optparse
 import sys

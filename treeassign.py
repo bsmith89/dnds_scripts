@@ -1,5 +1,14 @@
 #!/usr/bin/env python
-"""
+"""Add identifiers to single-treatment clades.
+
+Takes a newick formatted tree to stdin, a design file argument
+and an optional labels file argument, and prints a labeled tree.
+
+Every leaf which belongs to a particular treatment gets a tag,
+as do all higher level nodes which have no sub-clades containing
+leaves which belong to another treatment group.  Leaves which are
+not assigned to a treatment are ignored, and do not count as either
+in or out-of-treatment clades.
 
 """
 
@@ -10,7 +19,6 @@ import sys
 def recurse_label(clade, target, design, labels):
     """Label nodes and return True if all children are of Group.
 
-    Just pseudo-code right now
     """
     if clade.is_terminal(): # if it's a leaf
         try:
@@ -41,9 +49,25 @@ def recurse_label(clade, target, design, labels):
             return None
 
 def label_leaf(leaf, label):
+    """Label the given leaf with the provided label string.
+    
+    Adds the label, after a space, to the leaf's name.
+    """
     leaf.name += " %s" % label
 
 def label_node(node, label):
+    """Label the given node with the provided label string.
+
+    Adds the label, with a space, as the confidence value on the tree.
+    This is a hack, since Bio.Phylo doesn't seem to have another way to
+    label a node or to print this label the way I want it to a newick
+    tree.
+    
+    To correctly print a tree with these node labels you'll need to use
+    Bio.Phylo.write(tree, file, format, *format_confidence = '%s'*) since
+    otherwise it outputs confidence as decimal padded float.
+
+    """
     node.confidence = " %s" % label
 
 def main():
@@ -66,6 +90,9 @@ def main():
         for mapping in labels_file:
             grouping, label = mapping.split()
             labels[grouping] = label
+    # Consider combining these two labeling steps (leaves and nodes)
+    # into a single function outside of main().
+    #
     # Now actually do the labeling...
     for grouping in labels:
         recurse_label(tree.clade, grouping, design, labels)

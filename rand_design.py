@@ -1,3 +1,14 @@
+#!/usr/bin/env python
+"""Randomize sample-treatment mapping.
+
+Takes space delimitted design file to stdin and prints a tab delimited,
+randomized design file to stdout.
+
+Meant for making sure that the null hypothesis holds for de-associated
+data.
+
+"""
+
 import sys
 import random
 

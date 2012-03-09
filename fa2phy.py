@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""Converts fasta formatted stding to phylip-form stdout.
+
+"""
 
 import Bio
 from Bio import SeqIO
