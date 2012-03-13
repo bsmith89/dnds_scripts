@@ -25,7 +25,6 @@ def recurse_label_nodes(clade, target, design, labels):
             if design[clade.name] == target:
                 return True
             else:
-                sys.stderr.write("'%s' is not in '%s' but rather in '%s'\n" % (clade.name, target, design[clade.name]))
                 return False
         # If the node is not in the design mapping ignore it
         # and don't consider it in marking higher level nodes.
@@ -36,7 +35,6 @@ def recurse_label_nodes(clade, target, design, labels):
         for subclade in clade.clades:
             subclade_in_group = recurse_label_nodes(subclade, target, design, labels)
             if subclade_in_group is False:
-                sys.stderr.write("Not all in %s are in '%s'\n" % (str(subclade.get_terminals()), target))
                 all_in_group = False
             elif subclade_in_group is True and all_in_group is not False:
                 all_in_group = True
