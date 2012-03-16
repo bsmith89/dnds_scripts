@@ -40,7 +40,10 @@ def main():
         names += [line.strip()]
     tree = Bio.Phylo.read(tree_file, 'newick')
     prune_all_but(tree, names)
-    unroot(tree)
+    try:
+        unroot(tree)
+    except AssertionError: # the tree was unrooted
+        pass
     Bio.Phylo.write(tree, sys.stdout, 'newick')
 
 if __name__ == "__main__":
