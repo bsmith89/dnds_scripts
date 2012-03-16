@@ -7,7 +7,7 @@ import optparse
 import sys
 import Bio
 from Bio import Phylo
-
+from unroot import unroot
 
 def prune_all_but(tree, names):
     all_leaves = tree.get_terminals()
@@ -40,6 +40,7 @@ def main():
         names += [line.strip()]
     tree = Bio.Phylo.read(tree_file, 'newick')
     prune_all_but(tree, names)
+    unroot(tree)
     Bio.Phylo.write(tree, sys.stdout, 'newick')
 
 if __name__ == "__main__":
