@@ -6,6 +6,9 @@ sequence, and optional amino-acid alignment in FASTA format and tests
 for differential dN/dS between lineages present in one treatment vs.
 the other.
 
+TODO: Consider re-writing this as a analysis object which stores all
+of the important variables.
+
 """
 import optparse
 import sys
@@ -96,13 +99,41 @@ def main():
     subsample(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_dir)
     make_labels(analysis_dir, design_path)
     label_trees(analysis_dir, design_path, num_reps, num_trees)
+    fa2phy_all(analysis_dir, num_reps)
+    paml_run_all(analysis_dir)
     
     
-def make_labels(analysis_dir, design_path):
+def paml_run_all(analysis_dir, out_file):
+    """Carry out the full PAML analysis and print result to out_file.
+    
+    """
+    pass
+
+def fa2phy_all(analysis_dir, num_reps):
+    """Convert the aligned FASTA files to Phylip format.
+    
+    Makes them in the appropriate PAML format (interleaved,
+    with the 'I' option) and outputs to
+    '[analysis_dir]/rep##/name.rep##.phy'
+    """
+    pass
+    
+def make_labels(analysis_dir, name, design_path):
+    """Take a design file and make appropriate h0 and h1 labels.
+    
+    The labels are output to '[analysis_dir]/[name].master.h#.labels'.
+    """
     pass
                 
                 
 def label_trees(analysis_dir, design_path, num_reps, num_trees):
+    """Make PAML labeled trees in all of the appropriate directories.
+    
+    Takes master trees from '[analysis_dir]/[name].master.tre##.tre' and
+    outputs '[analysis_dir]/rep##/tre##/h#/[name].rep##.tre##.h#.nwk'
+    based on the labels found in '[analysis_dir]/[name].master.h#.labels'.
+    
+    """
     for rep in range(num_reps):
         for tree in range(num_trees):
             for hypothesis in [0,1]:
@@ -112,24 +143,67 @@ def label_trees(analysis_dir, design_path, num_reps, num_trees):
                 pass
         
 def split_trees(tree_path, analysis_dir):
+    """Separate each of the trees in tree_path into their own file.
+    
+    Outputs each tree to '[analysis_dir]/[name].master.tre##.tre'.
+    """
     pass
         
-def subsample(design_path, afn_path, tree_path, num_reps, num_seqs, analysis_dir):
+def subsample(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_dir):
+    """Subsample num_seqs seqs from each treatment in design_path.
+    
+    (1) Subsamples num_seqs, num_reps times from the names presented in
+    design_path and moves these aligned nucleotide sequences to 
+    '[analysis_dir]/rep##/name.rep##.afn'.
+    (2) Pares down the tree found in each [name].master.tre##.tre based
+    on the sequences in the subsample, and outputs the result to
+    '[analysis_dir]/rep##/name.rep##.afn'.
+    
+    """
     pass
 
 def backalign(fn_path, afa_path, out_path):
+    """Backalign the fn sequences to match the afa alignment.
+    
+    Takes nucleotide FASTA file from fn_path, aligned amino-acid FASTA
+    at afa_path, and prints aligned nucleotide FASTA to out_path.
+    
+    """
     pass
 
 def translate(fn_path, fa_path):
+    """Translate the fn_sequences.
+    
+    Takes unaligned nucleotide FASTA from fn_path and writes amino-acid
+    FASTA to out_path.
+    
+    """
     pass
 
 def mafft_align(fa_path, afa_path):
+    """Align amino acid FASTA file.
+    
+    Takes amino-acid seqs from fa_path and writes aligned amino-acids
+    to afa_path. 
+    
+    """
     pass
 
 def fasttree(afa_path, tree_path):
+    """Construct a phylogenetic tree using FastTree.
+    
+    Takes an amino-acid alignment from afa_path and outputs a
+    newick-formatted, support-less tree using FastTree to tree_path.
+    
+    """
     pass
 
 def init_filesys(analysis_dir, num_reps, num_trees):
+    """Create directory tree required for analysis.
+    
+    './[analysis_dir]/rep##/tre##/h#/' for each rep, tree, and h0/h1. 
+    
+    """
     try:
         os.mkdirs(analysis_dir)
     except OSError:
