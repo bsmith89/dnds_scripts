@@ -16,6 +16,7 @@ import os
 import shutil
 import datetime
 import random
+import threading
 import Bio.Phylo
 import Bio.SeqIO
 import Bio.AlignIO
@@ -66,10 +67,10 @@ def main():
                       default = None,
                       help = "the name of the analysis directory under \
                               [top-dir]/.")
-    parser.add_option("-D", "--dry-run", "--do-not-run-paml", action = "store_false",
-                      dest = "run_paml", default = True,
-                      help = "dry run.  Don't run paml, only setup all \
-                      of the necessary files.")
+#    parser.add_option("-D", "--dry-run", "--do-not-run-paml", action = "store_false",
+#                      dest = "run_paml", default = True,
+#                      help = "dry run.  Don't run paml, only setup all \
+#                      of the necessary files.")
     (opts, args) = parser.parse_args()
     fn_path = args[0]
     design_path = args[1]
@@ -81,7 +82,7 @@ def main():
         out_file = sys.stdout
     else:
         out_file = open(out_file, 'w')
-    top_dir = opts.top_dir
+    top_dir = os.path.abspath(opts.top_dir)
     num_reps = opts.num_reps
     num_seqs = opts.num_seqs
     if num_seqs is None and num_reps != 1:
@@ -116,8 +117,7 @@ Instead, num_reps = %d" % num_reps)
     make_labels(analysis_dir, design_path)
     label_trees(analysis_dir, design_path, num_reps, num_trees)
     fa2phy_all(analysis_dir, num_reps)
-    dry = not opts.run_paml
-    paml_run_all(analysis_dir, num_reps, num_trees, dry = dry)
+    thread_list = paml_run_all(analysis_dir, num_reps, num_trees)
     
 def init_filesys(analysis_dir, num_reps, num_trees):
     """Create directory tree required for analysis.
@@ -355,31 +355,27 @@ def fa2phy_all(analysis_dir, num_reps):
                 phy_file.write(line)
         phy_file.close()
         
-def paml_run_all(analysis_dir, num_reps, num_trees, dry = False):
-    """Carry out the full PAML analysis and print result to out_file.
-    
-    """
+def paml_run_all(analysis_dir, num_reps, num_trees):
+    thread_list = []
     for i in range(num_reps):
         for j in range(num_trees):
             for k in [0,1]:
                 cml = codeml.Codeml()
+                cml.working_dir = os.path.join(analysis_dir,
+                                               "rep%02d" % (i + 1),
+                                               "tree%02d" % (j + 1),
+                                               "h%d" % k)
                 cml.alignment = os.path.join(analysis_dir,
-                                        "rep%02d" % (i + 1),
-                                        "rep%02d.phy" % (i + 1))
-                cml.tree = os.path.join(analysis_dir,
-                                        "rep%02d" % (i + 1),
-                                        "tree%02d" % (j + 1),
-                                        "h%d" % k,
+                                             "rep%02d" % (i + 1),
+                                             "rep%02d.phy" % (j + 1))
+                cml.tree = os.path.join(cml.working_dir,
                                         "rep%02d.tre%02d.h%d.nwk" % (i + 1, j + 1, k))
+                cml.ctl_file = os.path.join("rep%02d.tre%02d.h%d.ctl" % (i + 1, j + 1, k))
                 cml.out_file = os.path.join(analysis_dir,
                                         "rep%02d" % (i + 1),
                                         "tree%02d" % (j + 1),
                                         "h%d" % k,
                                         "rep%02d.tre%02d.h%d.mlc" % (i + 1, j + 1, k))
-                cml.working_dir = os.path.join(analysis_dir,
-                                        "rep%02d" % (i + 1),
-                                        "tree%02d" % (j + 1),
-                                        "h%d" % k)
                 cml.set_options(runmode = 0,
                                 seqtype = 1,
                                 CodonFreq = 2,
@@ -400,15 +396,22 @@ def paml_run_all(analysis_dir, num_reps, num_trees, dry = False):
                                 cleandata = 0,
                                 fix_blength = 1,
                                 method = 0)
-                cml.ctl_file = os.path.join(analysis_dir,
-                                        "rep%02d" % (i + 1),
-                                        "tree%02d" % (j + 1),
-                                        "h%d" % k,
-                                        "codeml.ctl")
                 cml.write_ctl_file()
-                if dry is False:
-                    cml.run()
+                thread = CodemlThread(cml)
+                print("Adding a thread")
+                thread.start()
+                thread_list.append(thread)
+    return thread_list
                 
+class CodemlThread(threading.Thread):
+    def __init__(self, cml_object):
+        self.cml = cml_object
+        threading.Thread.__init__(self)
         
+    def run(self):
+        print(os.path.abspath(self.cml.tree))
+        self.cml.run()
+    
+                        
 if __name__ == "__main__":
     main()
