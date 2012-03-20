@@ -16,6 +16,11 @@ def get_seq_record(ident, seq_recs):
     for seq_rec in seq_recs:
         if seq_rec.id == ident:
             return seq_rec
+        
+def files(nucl_file, aa_file, out_file):
+    nucl_recs = list(Bio.SeqIO.parse(nucl_file, 'fasta', alphabet = Bio.Alphabet.generic_dna))
+    aa_recs = list(Bio.SeqIO.parse(aa_file, 'fasta', alphabet = Bio.Alphabet.generic_protein))
+    Bio.SeqIO.write(back_align_all(nucl_recs, aa_recs), out_file, 'fasta')
 
 def back_align_all(nucl_recs, aa_recs):
     out_nucl_recs = []

@@ -18,7 +18,11 @@ def prune_all_but(tree, names):
         prune_list.remove(name)
     for name in prune_list:
         tree.prune(name)
-
+        
+def files(master_tree, exclude_names, out_tree):
+    tree = Phylo.read(master_tree, 'newick')
+    prune_all_but(tree, exclude_names)
+    Phylo.write(tree, out_tree, 'newick')
 
 def main():
     usage = "usage: %prog [options] [tree] [names]"

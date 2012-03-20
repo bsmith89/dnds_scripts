@@ -6,9 +6,24 @@
 from Bio import SeqIO
 import sys
 
-seq_records = list(SeqIO.parse(sys.stdin, "fasta"))
-for record in seq_records:
-    seq = record.seq
-    aa = seq.translate()
-    record.seq = aa
-SeqIO.write(seq_records, sys.stdout, "fasta")
+def files(in_path, out_path):
+    seq_records = list(SeqIO.parse(in_path, "fasta"))
+    _translate(seq_records)
+    SeqIO.write(seq_records, out_path, "fasta")
+    
+def _translate(seq_records):
+    for record in seq_records:
+        seq = record.seq
+        aa = seq.translate()
+        record.seq = aa
+
+def main():
+    seq_records = list(SeqIO.parse(sys.stdin, "fasta"))
+    for record in seq_records:
+        seq = record.seq
+        aa = seq.translate()
+        record.seq = aa
+    SeqIO.write(seq_records, sys.stdout, "fasta")
+
+if __name__ == "__main__":
+    main()

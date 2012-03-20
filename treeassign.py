@@ -12,8 +12,7 @@ in or out-of-treatment clades.
 
 """
 
-import Bio
-from Bio import Phylo
+import Bio.Phylo
 import sys
 
 def recurse_label_nodes(clade, target, design, labels):
@@ -96,6 +95,19 @@ def parse_design_and_labels(design_file, labels_file = None):
 
 def write_tree(tree, out_file):
     Bio.Phylo.write(tree, out_file, 'newick', format_confidence = '%s')
+    
+def files(tree_path, design_path, labels_path, out_path):
+    tree_file = open(tree_path)
+    design_file = open(design_path)
+    labels_file = open(labels_path)
+    out_file = open(out_path, 'w')
+    _treeassign(tree_file, design_file, labels_file, out_file)
+    
+def _treeassign(tree_file, design_file, labels_file, out_file):
+    tree = Bio.Phylo.read(tree_file, 'newick')
+    design, labels = parse_design_and_labels(design_file, labels_file)
+    label_all(tree, design, labels)
+    write_tree(tree, out_file)
 
 def main():
     design_path = sys.argv[1]
@@ -105,10 +117,7 @@ def main():
         labels_file = open(labels_path)
     except IndexError:
         labels_file = None
-    tree = Bio.Phylo.read(sys.stdin, 'newick')
-    design, labels = parse_design_and_labels(design_file, labels_file)
-    label_all(tree, design, labels)
-    write_tree(tree, sys.stdout)
+    _treeassign(sys.stdin, design_file, labels_file, sys.stdout)
 
 if __name__ == '__main__':
     main()
