@@ -17,6 +17,7 @@ import shutil
 import datetime
 import random
 import threading
+import time
 import Bio.Phylo
 import Bio.SeqIO
 import Bio.AlignIO
@@ -47,8 +48,6 @@ def main():
                               subsamples for each if reps > 1 \
                               DEFAULT: generates FastTree phylogeny from \
                               aligned amino-acids.")
-    parser.add_option("-o", "--out", dest = "out_path", default = None,
-                      help = "print output here instead of stdout")
     parser.add_option("-d", "--dir", dest = "top_dir",
                       default = DEFAULT_TOP_DIR,
                       help = "top level directory for intermediate analysis \
@@ -76,12 +75,6 @@ def main():
     design_path = args[1]
     afa_path = opts.afa_path
     tree_path = opts.tree_path
-    out_path = opts.out_path
-    out_file = None
-    if out_path is None:
-        out_file = sys.stdout
-    else:
-        out_file = open(out_file, 'w')
     top_dir = os.path.abspath(opts.top_dir)
     num_reps = opts.num_reps
     num_seqs = opts.num_seqs
@@ -90,7 +83,7 @@ def main():
 Instead, num_reps = %d" % num_reps)
     num_trees = 1
     if tree_path is not None:
-        num_trees = len(list(Bio.Phylo.parse(tree_path)))
+        num_trees = len(list(Bio.Phylo.parse(tree_path, 'newick')))
     name = opts.name
     if name is None:
         d = datetime.datetime.now()
@@ -117,6 +110,7 @@ Instead, num_reps = %d" % num_reps)
     make_labels(analysis_dir, design_path)
     label_trees(analysis_dir, design_path, num_reps, num_trees)
     fa2phy_all(analysis_dir, num_reps)
+    copy_phys(analysis_dir, num_reps, num_trees)
     thread_list = paml_run_all(analysis_dir, num_reps, num_trees)
     
 def init_filesys(analysis_dir, num_reps, num_trees):
@@ -355,6 +349,20 @@ def fa2phy_all(analysis_dir, num_reps):
                 phy_file.write(line)
         phy_file.close()
         
+def copy_phys(analysis_dir, num_reps, num_trees):
+    for i in range(num_reps):
+        for j in range(num_trees):
+            for k in [0,1]:
+                src_path = os.path.join(analysis_dir,
+                                        "rep%02d" % (i + 1),
+                                        "rep%02d.phy" % (i + 1))
+                dst_path = os.path.join(analysis_dir,
+                                        "rep%02d" % (i + 1),
+                                        "tree%02d" % (j + 1),
+                                        "h%d" % k,
+                                        "rep%02d.tre%02d.h%d.phy" % (i + 1, j + 1, k))
+                shutil.copy(src_path, dst_path)
+        
 def paml_run_all(analysis_dir, num_reps, num_trees):
     thread_list = []
     for i in range(num_reps):
@@ -365,18 +373,17 @@ def paml_run_all(analysis_dir, num_reps, num_trees):
                                                "rep%02d" % (i + 1),
                                                "tree%02d" % (j + 1),
                                                "h%d" % k)
-                cml.alignment = os.path.join(analysis_dir,
-                                             "rep%02d" % (i + 1),
-                                             "rep%02d.phy" % (j + 1))
+                cml.alignment = os.path.join(cml.working_dir,
+                                             "rep%02d.tre%02d.h%d.phy" % (i + 1, j + 1, k))
                 cml.tree = os.path.join(cml.working_dir,
                                         "rep%02d.tre%02d.h%d.nwk" % (i + 1, j + 1, k))
-                cml.ctl_file = os.path.join("rep%02d.tre%02d.h%d.ctl" % (i + 1, j + 1, k))
-                cml.out_file = os.path.join(analysis_dir,
-                                        "rep%02d" % (i + 1),
-                                        "tree%02d" % (j + 1),
-                                        "h%d" % k,
-                                        "rep%02d.tre%02d.h%d.mlc" % (i + 1, j + 1, k))
-                cml.set_options(runmode = 0,
+                cml.ctl_file = os.path.join(cml.working_dir, 
+                                            "rep%02d.tre%02d.h%d.ctl" % (i + 1, j + 1, k))
+                cml.out_file = os.path.join(cml.working_dir,
+                                            "rep%02d.tre%02d.h%d.mlc" % (i + 1, j + 1, k))
+                cml.set_options(noisy = 3,
+                                verbose = 1,
+                                runmode = 0,
                                 seqtype = 1,
                                 CodonFreq = 2,
                                 ndata = 1,
@@ -398,8 +405,11 @@ def paml_run_all(analysis_dir, num_reps, num_trees):
                                 method = 0)
                 cml.write_ctl_file()
                 thread = CodemlThread(cml)
-                print("Adding a thread")
                 thread.start()
+                # Now pause for 3 seconds to allow codeml to start
+                # before os.chdir (in _paml.run()) which is a global
+                # variable (very bad!)
+                time.sleep(3)
                 thread_list.append(thread)
     return thread_list
                 
@@ -409,7 +419,6 @@ class CodemlThread(threading.Thread):
         threading.Thread.__init__(self)
         
     def run(self):
-        print(os.path.abspath(self.cml.tree))
         self.cml.run()
     
                         
