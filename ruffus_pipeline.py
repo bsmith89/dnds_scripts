@@ -437,7 +437,6 @@ def report_results(results_paths, master_results_path):
     with open(master_results_path, 'w') as out_file:
         pass
 
-
 if __name__ == "__main__":
     usage = "usage: %prog [options] fn-file design-file"
     parser = optparse.OptionParser(usage = usage)
