@@ -2,7 +2,6 @@ import ruffus
 import optparse
 import os
 import random
-import sys
 import Bio.SeqIO
 import Bio.Align.Applications
 import Bio.Application
@@ -32,7 +31,7 @@ MSTR_RSLTS_PATH_TMPL = "%(prefix)smaster.results.tsv"
 CODEML_DIR_TMPL = "%(prefix)srep%(rep)02d-h%(hypo)d"
 
 
-class PipelineMetadata(object):
+class DiffSelPipelineMetadata():
     def __init__(self, prefix, top_dir, fn_path, design_path, num_reps, num_seqs, **kwargs):
         self.prefix = prefix
         self.top_dir = top_dir
@@ -40,7 +39,6 @@ class PipelineMetadata(object):
         self.design_path = design_path
         self.num_reps = num_reps
         self.num_seqs = num_seqs
-        
                 
     def _get_codeml_dir(self, rep, hypo):
         return os.path.join(self.top_dir, CODEML_DIR_TMPL % dict(prefix = self.prefix, rep = rep, hypo = hypo))
@@ -474,12 +472,12 @@ if __name__ == "__main__":
     opts, args = parser.parse_args()    
     fn_path = args[0]
     design_path = args[1]
-    pipeline_metadata = PipelineMetadata(opts.prefix,
-                                         opts.top_dir,
-                                         fn_path,
-                                         design_path,
-                                         opts.num_reps,
-                                         opts.num_seqs)
+    pipeline_metadata = DiffSelPipelineMetadata(opts.prefix,
+                                                opts.top_dir,
+                                                fn_path,
+                                                design_path,
+                                                opts.num_reps,
+                                                opts.num_seqs)
     verbosity = opts.verbosity
     make_top_dir(None, opts.top_dir)
     
