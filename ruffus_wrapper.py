@@ -12,28 +12,36 @@ checkers.
 Use like so:
 >>> class Foo_md(PipelineMetadata):
 ...     _path_tmplts = dict(input = 'test.in', output = 'test.out')
-...     
-... class Foo_task(Task):
+...
+... class Foo_task1(Task):
+...     "Make an input file."
+...     def args_gen(self):
+...         yield([], [self.pipeline_metadata.get_path('input')])
+...     def __call__(self, input_path_list, output_path_list):
+...         with open(output_path_list[0], 'w') as output_file:
+...             output_file.write("This is\nAn Output\n file.")
+...
+... class Foo_task2(Task):
 ...     "Copy input file to output file."
 ...     def args_gen(self):
 ...         yield([self.pipeline_metadata.get_path('input')],
 ...               [self.pipeline_metadata.get_path('output')])
-...
 ...     def __call__(self, input_path_list, output_path_list):
 ...         with open(input_path_list[0]) as input_file, open(output_path_list[0], 'w') as output_file:
 ...             for line in input_file:
 ...                 output_file.write(line)
 ...
 ... class Foo_pipeline(Pipeline):
-...     _tasks = [Foo_task]
-...     _topology = dict(Foo_task = [])
+...     _task_classes = set([Foo_task1, Foo_task2])
+...     _topology = dict(Foo_task1 = [], Foo_task2 = [Foo_task1])
 ...
 ... md = Foo_md()
-... f = Foo_pipeline(Foo_md)
+... f = Foo_pipeline(md)
 ... f.run()
 
 """
 import ruffus
+from ruffus.graph import node as ruffus_nodes
 
 class PipelineMetadata(object):
     _path_tmplts = {}
@@ -46,7 +54,7 @@ class PipelineMetadata(object):
             self.__setattr__(key, kwargs[key])
     
     def get_path(self, file_type, **kwargs):
-        return self._path_tmplts[file_type] % dict(list(self.__dict__.items()),
+        return self._path_tmplts[file_type] % dict(list(self.__dict__.items()) + \
                                                    list(kwargs.items()))    
 
 class Task(object):
@@ -59,25 +67,29 @@ class Task(object):
     def up2date_checker(self, inputs_list, outputs_list, *args, **kwargs):
         raise NotImplementedError("You must define up2date_checker for each Task subclass.\n\
 If it is not defined the default ruffus up-to-date checker will run.")
+        # Consider removing this from the base_class, since I don't think
+        # we want to make pipeline think that it has an up2date_checker
+        # method when it really doesn't.
     
     def __call__(self, inputs_list, outputs_list, *args, **kwargs):
         raise NotImplementedError("You must define __call__ for each Task subclass.")
 
 class Pipeline(object):
-    _tasks = []
+    _task_classes = set()
     _topology = {}
     
     def __init__(self, pipeline_metadata):
         self.pipeline_metadata = pipeline_metadata
         self._initialized = {}
-        for i in range(len(self._tasks)):
-            # replace a list of Task subclasses with a list of Task objects
-            self._tasks[i] = self._tasks[i](self.pipeline_metadata) 
+        self._tasks = []
+        for task_class in self._task_classes:
+            self._tasks += [task_class(self.pipeline_metadata)]
         for task in self._tasks:
             self.initialize(task)
         
     def get_follows(self, task):
-        return self._topology[task]
+        follows_list = self._topology.get(task.__class__)
+        return follows_list
     
     def tasks(self):
         for task in self._tasks:
@@ -92,16 +104,34 @@ class Pipeline(object):
     def initialize(self, task):
         if not self.initialized(task):
             if hasattr(task, 'up2date_checker'):
-                @ruffus.follows(self.get_follows(task))
+                @ruffus.follows(*self.get_follows(task))
                 @ruffus.files(task.args_gen)
                 @ruffus.check_if_uptodate(task.up2date_checker)
                 def wrapped_task(*args, **kwargs):
                     task(*args, **kwargs)
             else:
-                @ruffus.follows(self.get_follows(task))
+                @ruffus.follows(*self.get_follows(task))
                 @ruffus.files(task.args_gen)
                 def wrapped_task(*args, **kwargs):
                     task(*args, **kwargs)
+            # It looks like I should be hacking a bunch of other
+            # attributes in ruffus_nodes. :(
+            # TODO:
+            method_name = "_%s" % task.__class__.__name__.lower()
+            self.__setattr__(method_name, wrapped_task)
+            # This whole block here is a hack to change the ruffus-saved name of
+            # the task to what I want, which is the Task class-name.
+            dummy_node_name = '%s.wrapped_task' % wrapped_task.__module__
+            new_node_name = '%s.%s' % (__name__, task.__class__.__name__)
+            # is it possible that by using self.__class__ instead of
+            # wrapped_task.__module__, that I could define multiple pipelines
+            # in one module?  This would be optimal! 
+            ruffus_node = ruffus_nodes.lookup_node_from_name(dummy_node_name)
+            ruffus_nodes._name_to_node[new_node_name] = ruffus_node
+            ruffus_node.semaphore_name = new_node_name
+            del ruffus_nodes._name_to_node[dummy_node_name]
+            # So will this task (node in ruffus speak) be 'findable' by other tasks with
+            # incoming or outgoing dependencies?
             self._initialized[task] = True
             
     def all_initialized(self):
@@ -111,5 +141,5 @@ class Pipeline(object):
         return True
             
     def run(self, *args, **kwargs):
-        pass
+        ruffus.pipeline_run([self.tasks[-1]])
     
