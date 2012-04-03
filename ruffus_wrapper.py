@@ -42,6 +42,7 @@ Use like so:
 ... f.run()
 
 """
+import functools
 import re
 import ruffus
 from ruffus.graph import node as ruffus_nodes
@@ -104,73 +105,19 @@ class Pipeline(object):
             yield key
         
     def _initialize(self, task_object):
-        print("Init'ing a task.")
-        function_name = self._function(task_object.__class__)
         if hasattr(task_object, 'up2date_checker'):
-            method = task_object.__call__
-            method.__name__ = task_object.__class__.__name__.lower()
-            globals()[function_name] = ruffus.follows(
-                                        ruffus.files(
-                                         ruffus.check_if_uptodate(
-                                          method,
-                                         task_object.up2date_checker),
-                                        task_object.args_gen),
-                                       self._get_follows(task_object))
+            @ruffus.follows(*self._get_follows(task_object))
+            @ruffus.files(task_object.args_gen)
+            @ruffus.check_if_uptodate(task_object.up2date_checker)
+            @functools.wraps(task_object) # what does it need to update?
+            def wrapped_task(*args, **kwargs):
+                task_object(*args, **kwargs)
         else:
-            method = task_object.__call__
-            method.__name__ = task_object.__class__.__name__.lower()
-            globals()[function_name] = ruffus.follows(
-                                        ruffus.files(
-                                          method,
-                                        task_object.args_gen),
-                                       self._get_follows(task_object))
-                                       
-#        if hasattr(task_object, 'up2date_checker'):
-#            @ruffus.follows(*self._get_follows(task_object))
-#            @ruffus.files(task_object.args_gen)
-#            @ruffus.check_if_uptodate(task_object.up2date_checker)
-#            def wrapped_task(*args, **kwargs):
-#                task_object(*args, **kwargs)
-#        else:
-#            @ruffus.follows(*self._get_follows(task_object))
-#            @ruffus.files(task_object.args_gen)
-#            def wrapped_task(*args, **kwargs):
-#                task_object(*args, **kwargs)
-#        # Now I have a wrapped function, but it's only defined in the local
-#        # name space, and all of the assignments in ruffus.graph.node are
-#        # incorrect.  I need to reassign basically everything in
-#        # the _task function to point to a new global (i.e. module level)
-#        # function which was assigned to this wrapped function
-#        function_name = self._function(task_object.__class__)
-#        # set the correct global reference to function
-#        globals()[function_name] = wrapped_task
-#        wrapped_task.__name__ = function_name
-#        wrapped_task.__doc__ = task_object.__call__.__doc__
-#        task_name = "%s.%s" % (__name__, function_name)
-#        dummy_name = "%s.%s" % (__name__, 'wrapped_task')
-#        ruffus_task = ruffus_nodes._name_to_node[dummy_name]
-#        if task_object.__doc__:
-#            # dunno what this does, but it's how ruffus writes the _description
-#            ruffus_task._description = re.sub("\n\s+", " ",
-#                                              task_object.__doc__).strip()
-#        else:
-#            ruffus_task._description = ""
-#        ruffus_task._func_name = function_name
-#        ruffus_task._name = task_name
-#        ruffus_task.semaphore_name = task_name
-#        ruffus_task.user_defined_work_func = globals()[function_name]
-#        if task_name in ruffus_nodes._name_to_node:
-#            # then the task object was already created with the intention
-#            # of assigning most of its properties in the future.
-#            # The only important property seems to be _inward which 
-#            # had a task object added to it every time
-#            # the function name was found in a follows statement.
-#            ruffus_task._outward = ruffus_nodes._name_to_node[task_name]._outward
-#            ruffus_task._inward = ruffus_nodes._name_to_node[task_name]._inward
-#            ruffus_nodes._all_nodes.remove(ruffus_nodes._name_to_node[task_name])
-#        ruffus_nodes._name_to_node[task_name] = ruffus_task
-#        # remove the originally assigned, incorrect _task object from two places:
-#        del ruffus_nodes._name_to_node[dummy_name]
+            @ruffus.follows(*self._get_follows(task_object))
+            @ruffus.files(task_object.args_gen)
+            @functools.wraps(task_object)
+            def wrapped_task(*args, **kwargs):
+                task_object(*args, **kwargs)
                     
     def __call__(self, *args, **kwargs):
         ruffus.pipeline_run(*args, **kwargs)
@@ -180,7 +127,6 @@ def reset_ruffus():
     ruffus_nodes._name_to_node = {}
     ruffus_nodes._global_node_index = 0
         
-#if __name__ == "__main__":
 if __name__ == "__main__":
     class Foo_md(PipelineMetadata):
         _path_tmplts = dict(input = 'test.in', output = 'test.out')
