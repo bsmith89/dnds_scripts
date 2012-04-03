@@ -74,8 +74,9 @@ class BaseMetadata(object):
     _reqd_kwargs = []
     
     def __init__(self, **kwargs):
-        for arg in self._reqd_kwargs:
-            assert arg in kwargs
+        for key in self._reqd_kwargs:
+            assert key in kwargs
+            assert kwargs[key] is not None
         for key in kwargs:
             self.__setattr__(key, kwargs[key])
     
