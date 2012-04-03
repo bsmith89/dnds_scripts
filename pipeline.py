@@ -64,10 +64,12 @@ For example, a pipeline module might look like this:
 ...         _task2(*args, **kwargs
 ...
 ...     ruffus.run_pipeline(*run_args, **run_kwargs)
+
+TODO: Update the example.  Won't work currently.
 """
 
 
-class PipelineMetadata(object):
+class BaseMetadata(object):
     _path_tmplts = {}
     _reqd_kwargs = []
     
@@ -81,7 +83,7 @@ class PipelineMetadata(object):
         return self._path_tmplts[file_type] % dict(list(self.__dict__.items()) + \
                                                    list(kwargs.items()))    
 
-class Task(object):
+class BaseTask(object):
     def __init__(self, pipeline_metadata):
         self.pipeline_metadata = pipeline_metadata
         

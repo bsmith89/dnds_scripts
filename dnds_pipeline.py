@@ -1,14 +1,15 @@
 """
 
 """
-from ruffus_wrapper import *
+from pipeline import *
+from utils import *
 import ruffus
 import functools
 
-class Metadata(PipelineMetadata):
+class Metadata(BaseMetadata):
     _path_tmplts = dict(input = 'test.in', output = 'test.out')
 
-class Task1(Task):
+class Task1(BaseTask):
     "Make an input file."
     def args_gen(self):
         yield([], [self.pipeline_metadata.get_path('input')])
