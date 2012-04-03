@@ -52,12 +52,14 @@ For example, a pipeline module might look like this:
 ...     _task1 = Foo_task1(md)
 ...     @ruffus.follows()
 ...     @ruffus.files(_task1.args_gen)
+...     @functools.wraps(_task1)
 ...     def task1(*args, **kwargs):
 ...         _task1(*args, **kwargs)
 ...
 ...     _task2 = Foo_task2(md)
 ...     @ruffus.follows()
 ...     @ruffus.files(_task2.args_gen)
+...     @functools.wraps(_task2)
 ...     def task2(*args, **kwargs):
 ...         _task2(*args, **kwargs
 ...
