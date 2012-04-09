@@ -332,8 +332,8 @@ def subsample_seqs(design_afn_paths_list, names_afn_out_paths_list, num_seqs):
             if rec.name in out_seq_names:
                 names_out_file.write("%s\n" % rec.name)
                 out_recs += [rec]
-    assert len(out_recs) == len(out_seq_names)
-    Bio.SeqIO.write(out_recs, afn_out_path, 'fasta')
+        assert len(out_recs) == len(out_seq_names)
+        Bio.SeqIO.write(out_recs, afn_out_path, 'fasta')
 
 def calc_tree(afa_path, tree_out_path):
     class FastTreeCommandline(Bio.Application.AbstractCommandline):

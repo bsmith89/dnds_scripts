@@ -6,18 +6,15 @@ sequence, and optional amino-acid alignment in FASTA format and tests
 for differential dN/dS between lineages present in one treatment vs.
 the other.
 
-TODO: Consider re-writing this as a analysis object which stores all
-of the important variables.
-
 """
 import optparse
-import sys
 import os
 import shutil
 import datetime
 import random
 import threading
 import time
+import math
 import Bio.Phylo
 import Bio.SeqIO
 import Bio.AlignIO
@@ -89,10 +86,11 @@ Instead, num_reps = %d" % num_reps)
         d = datetime.datetime.now()
         name = "%d-%d-%d-%d-%d-%d" % (d.year, d.month, d.day, d.hour, d.minute, d.second)
     analysis_dir = os.path.join(top_dir, name)
-    init_filesys(analysis_dir, num_reps, num_trees)
+    num_treatments = get_num_treatments(design_path)
+    init_filesys(analysis_dir, num_reps, num_trees, num_treatments)
     if afa_path is None:
         fa_path = os.path.join(analysis_dir, "master.fa")
-        _translate(fn_path, fa_path)
+        translate2(fn_path, fa_path)
         afa_path = os.path.join(analysis_dir, "master.afa")
         mafft_align(fa_path, afa_path)
     # make a FastTree tree or split the tree(s) found in the tree file
@@ -102,18 +100,28 @@ Instead, num_reps = %d" % num_reps)
     else:
         split_trees(tree_path, analysis_dir)
     afn_path = os.path.join(analysis_dir, "master.afn")
-    _backalign(fn_path, afa_path, afn_path)
+    backalign2(fn_path, afa_path, afn_path)
     new_design_path = os.path.join(analysis_dir, "master.design")
     shutil.copy2(design_path, new_design_path)
     design_path = new_design_path
-    _subsample(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_dir)
+    subsample2(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_dir)
     make_labels(analysis_dir, design_path)
-    label_trees(analysis_dir, design_path, num_reps, num_trees)
+    label_trees(analysis_dir, design_path, num_treatments, num_reps, num_trees)
     fa2phy_all(analysis_dir, num_reps)
-    copy_phys(analysis_dir, num_reps, num_trees)
-    thread_list = paml_run_all(analysis_dir, num_reps, num_trees)
+    copy_phys(analysis_dir, num_reps, num_trees, num_treatments)
+    thread_list = paml_run_all(analysis_dir, num_reps, num_trees, num_treatments)
     
-def init_filesys(analysis_dir, num_reps, num_trees):
+def get_num_treatments(design_path):
+    design = {}
+    with open(design_path) as design_file:
+        for line in design_file:
+            name, treatment = line.strip().split()
+            if treatment not in design:
+                design[treatment] = []
+            design[treatment] += [name]
+    return len(design)
+    
+def init_filesys(analysis_dir, num_reps, num_trees, num_treatments):
     """Create directory tree required for analysis.
     
     './[analysis_dir]/rep##/tre##/h#/' for each rep, tree, and h0/h1. 
@@ -128,11 +136,16 @@ the previous analysis directory; CAUTION: make sure the previous analysis \
 has finished running or files could be corrupted." % (analysis_dir))
     for rep in range(num_reps):
         for tree in range(num_trees):
-            for hypo in [0,1]:
+            for k in range(math.factorial(num_treatments - 1) + 1):
+                hypo_str = ""
+                if k == 0:
+                    hypo_str = "a"
+                else:
+                    hypo_str = "0%d" % k
                 directory = os.path.join(analysis_dir, "rep%02d" % (rep + 1), 
                                          "tree%02d" % (tree + 1), 
-                                         "h%d" % hypo)
-                os.makedirs(directory)        
+                                         "h%s" % hypo_str)
+                os.makedirs(directory)
 
 def split_trees(tree_path, analysis_dir):
     """Separate each of the trees in tree_path into their own file.
@@ -145,7 +158,7 @@ def split_trees(tree_path, analysis_dir):
         Bio.Phylo.write(tree, tree_i_path, 'newick')
         i += 1
 
-def _translate(fn_path, fa_path):
+def translate2(fn_path, fa_path):
     """Translate the fn_sequences.
     
     Takes unaligned nucleotide FASTA from fn_path and writes amino-acid
@@ -168,7 +181,7 @@ def mafft_align(fa_path, afa_path):
     open(afa_path, "w").write(stdout)
     open("%s.err" % afa_path, 'w').write(stderr)
 
-def _backalign(fn_path, afa_path, out_path):
+def backalign2(fn_path, afa_path, out_path):
     """Backalign the fn sequences to match the afa alignment.
     
     Takes nucleotide FASTA file from fn_path, aligned amino-acid FASTA
@@ -203,7 +216,7 @@ def fasttree(afa_path, tree_path):
     open("%s.err" % tree_path, 'w').write(stderr)
 
         
-def _subsample(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_dir):
+def subsample2(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_dir):
     """Subsample num_seqs seqs from each treatment in design_path.
     
     (1) Subsamples num_seqs, num_reps times from the names presented in
@@ -227,7 +240,7 @@ def _subsample(design_path, afn_path, num_reps, num_trees, num_seqs, analysis_di
                                          "tree%02d" % (j + 1),
                                          "rep%02d.tre%02d.tre" % (i + 1, j + 1))
             names_list = names_from_fa(afn_out_path)
-            _paretree(master_tree_path, names_list, out_tree_path)
+            paretree2(master_tree_path, names_list, out_tree_path)
 
 def names_from_fa(fa_path):
     names = []
@@ -236,7 +249,7 @@ def names_from_fa(fa_path):
         names += [record.name]
     return names
         
-def _paretree(master_tree_path, names_list, out_tree_path):
+def paretree2(master_tree_path, names_list, out_tree_path):
     paretree.files(master_tree_path, names_list, out_tree_path)
 
 def single_subsample(design_path, afn_path, num_seqs, afn_out_path):
@@ -246,10 +259,6 @@ def single_subsample(design_path, afn_path, num_seqs, afn_out_path):
     afn_out_path.
     
     """
-    if num_seqs is None:
-        shutil.copy2(afn_path, afn_out_path)
-        return
-    
     full_design = {}
     with open(design_path) as design_file:
         for line in design_file:
@@ -260,10 +269,18 @@ def single_subsample(design_path, afn_path, num_seqs, afn_out_path):
         treatments[treatment] = []
     seq_records = list(Bio.SeqIO.parse(afn_path, 'fasta'))
     for record in seq_records:
-        treatments[full_design[record.name]] += [record.name]
+        try:
+            treatment = full_design[record.name]
+        except KeyError:
+            pass
+        else:
+            treatments[treatment] += [record.name]
     sampled_seq_names = []
     for treatment in treatments:
-        sampled_seq_names += random.sample(treatments[treatment], num_seqs)
+        if num_seqs is None:
+            sampled_seq_names += treatments[treatment]
+        else:
+            sampled_seq_names += random.sample(treatments[treatment], num_seqs)
     out_seqs = []
     for record in seq_records:
         if record.name in sampled_seq_names:
@@ -271,30 +288,42 @@ def single_subsample(design_path, afn_path, num_seqs, afn_out_path):
     Bio.SeqIO.write(out_seqs, afn_out_path, 'fasta')
 
 def make_labels(analysis_dir, design_path):
-    """Take a design file and make appropriate h0 and h1 labels.
+    """Take a design file and make appropriate ha and h01, h02, ..., factorial(treatments - 1) labels.
     
     The labels are output to '[analysis_dir]/master.h#.labels'.
     """
-    h0_labels_path = os.path.join(analysis_dir, "master.h0.labels")
-    h1_labels_path = os.path.join(analysis_dir, "master.h1.labels")
-    h0_labels_file = open(h0_labels_path, 'w')
-    h1_labels_file = open(h1_labels_path, 'w')
-    design_file = open(design_path)
+    ha_labels_path = os.path.join(analysis_dir, "master.ha.labels")
+    ha_labels_file = open(ha_labels_path, 'w')
     treatments = []
-    for line in design_file:
-        treatment = line.strip().split()[1]
-        if treatment not in treatments:
-            treatments += [treatment]
-    design_file.close()
-    i = 0
+    with open(design_path) as design_file:
+        for line in design_file:
+            treatment = line.strip().split()[1]
+            if treatment not in treatments:
+                treatments += [treatment]
+    i = 1
     for treatment in treatments:
-        h0_labels_file.write("%s\t#1\n" % (treatment))
-        h1_labels_file.write("%s\t#%d\n" % (treatment, i + 1))
+        ha_labels_file.write("%s\t#%d\n" % (treatment, i))
         i += 1
-    h0_labels_file.close()
-    h1_labels_file.close()
+    ha_labels_file.close()
+    assert len(treatments) != 0
+    
+    hypo = 1
+    for i in range(len(treatments) - 1):
+        for j in range(i + 1, len(treatments)):
+            hypo_str = "0%d" % hypo
+            set_equal = [treatments[i], treatments[j]]
+            labels_path = os.path.join(analysis_dir, "master.h%s.labels" % hypo_str)
+            with open(labels_path, 'w') as labels_file:
+                treatment_index = 2
+                for treatment in treatments:
+                    if treatment in set_equal:
+                        labels_file.write("%s\t#%d\n" % (treatment, 1))
+                    else:
+                        labels_file.write("%s\t#%d\n" % (treatment, treatment_index))
+                        treatment_index += 1
+            hypo += 1
 
-def label_trees(analysis_dir, design_path, num_reps, num_trees):
+def label_trees(analysis_dir, design_path, num_treatments, num_reps, num_trees):
     """Make PAML labeled trees in all of the appropriate directories.
     
     Takes master trees from '[analysis_dir]/master.tre##.tre' and
@@ -304,19 +333,24 @@ def label_trees(analysis_dir, design_path, num_reps, num_trees):
     """
     for rep in range(num_reps):
         for tree in range(num_trees):
-            for hypo in [0,1]:
+            for hypo in range(math.factorial(num_treatments - 1) + 1):
+                hypo_str = ""
+                if hypo == 0:
+                    hypo_str = "a"
+                else:
+                    hypo_str = "0%d" % hypo
                 out_path = os.path.join(analysis_dir, "rep%02d" % (rep + 1), 
                                         "tree%02d" % (tree + 1), 
-                                        "h%d" % hypo,
-                                        "rep%02d.tre%02d.h%d.nwk" % \
-                                        (rep + 1, tree + 1, hypo))
+                                        "h%s" % hypo_str,
+                                        "rep%02d.tre%02d.h%s.nwk" % \
+                                        (rep + 1, tree + 1, hypo_str))
                 tree_path = os.path.join(analysis_dir, "rep%02d" % (rep + 1),
                                          "tree%02d" % (tree + 1),
                                          "rep%02d.tre%02d.tre" % \
                                          (rep + 1, tree + 1))
                 label_path = os.path.join(analysis_dir, 
-                                          "master.h%d.labels" % \
-                                          (hypo))
+                                          "master.h%s.labels" % \
+                                          (hypo_str))
                 treeassign.files(tree_path, design_path, label_path, out_path)
 
 def fa2phy_all(analysis_dir, num_reps):
@@ -349,38 +383,48 @@ def fa2phy_all(analysis_dir, num_reps):
                 phy_file.write(line)
         phy_file.close()
         
-def copy_phys(analysis_dir, num_reps, num_trees):
+def copy_phys(analysis_dir, num_reps, num_trees, num_treatments):
     for i in range(num_reps):
         for j in range(num_trees):
-            for k in [0,1]:
+            for k in range(math.factorial(num_treatments - 1) + 1):
+                hypo_str = ""
+                if k == 0:
+                    hypo_str = "a"
+                else:
+                    hypo_str = "0%d" % k
                 src_path = os.path.join(analysis_dir,
                                         "rep%02d" % (i + 1),
                                         "rep%02d.phy" % (i + 1))
                 dst_path = os.path.join(analysis_dir,
                                         "rep%02d" % (i + 1),
                                         "tree%02d" % (j + 1),
-                                        "h%d" % k,
-                                        "rep%02d.tre%02d.h%d.phy" % (i + 1, j + 1, k))
+                                        "h%s" % hypo_str,
+                                        "rep%02d.tre%02d.h%s.phy" % (i + 1, j + 1, hypo_str))
                 shutil.copy(src_path, dst_path)
         
-def paml_run_all(analysis_dir, num_reps, num_trees):
+def paml_run_all(analysis_dir, num_reps, num_trees, num_treatments):
     thread_list = []
     for i in range(num_reps):
         for j in range(num_trees):
-            for k in [0,1]:
+            for k in range(math.factorial(num_treatments - 1) + 1):
+                hypo_str = ""
+                if k == 0:
+                    hypo_str = "a"
+                else:
+                    hypo_str = "0%d" % k
                 cml = codeml.Codeml()
                 cml.working_dir = os.path.join(analysis_dir,
                                                "rep%02d" % (i + 1),
                                                "tree%02d" % (j + 1),
-                                               "h%d" % k)
+                                               "h%s" % hypo_str)
                 cml.alignment = os.path.join(cml.working_dir,
-                                             "rep%02d.tre%02d.h%d.phy" % (i + 1, j + 1, k))
+                                             "rep%02d.tre%02d.h%s.phy" % (i + 1, j + 1, hypo_str))
                 cml.tree = os.path.join(cml.working_dir,
-                                        "rep%02d.tre%02d.h%d.nwk" % (i + 1, j + 1, k))
+                                        "rep%02d.tre%02d.h%s.nwk" % (i + 1, j + 1, hypo_str))
                 cml.ctl_file = os.path.join(cml.working_dir, 
-                                            "rep%02d.tre%02d.h%d.ctl" % (i + 1, j + 1, k))
+                                            "rep%02d.tre%02d.h%s.ctl" % (i + 1, j + 1, hypo_str))
                 cml.out_file = os.path.join(cml.working_dir,
-                                            "rep%02d.tre%02d.h%d.mlc" % (i + 1, j + 1, k))
+                                            "rep%02d.tre%02d.h%s.mlc" % (i + 1, j + 1, hypo_str))
                 cml.set_options(noisy = 3,
                                 verbose = 1,
                                 runmode = 0,
