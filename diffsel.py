@@ -368,7 +368,7 @@ def fa2phy_all(analysis_dir, num_reps):
                                "rep%02d.phy" % (rep + 1))
         phy_file = open(phy_path, 'w')
         alignments = Bio.AlignIO.parse(fa_file, 'fasta')
-        Bio.AlignIO.write(alignments, phy_file, 'phylip')
+        Bio.AlignIO.write(alignments, phy_file, 'phylip-relaxed')
         phy_file.close()
         phy_file = open(phy_path)
         phy_lines = phy_file.readlines()
@@ -463,7 +463,7 @@ class CodemlThread(threading.Thread):
         threading.Thread.__init__(self)
         
     def run(self):
-        self.cml.run()
+        self.cml.run(verbose = True)
     
                         
 if __name__ == "__main__":

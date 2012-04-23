@@ -152,10 +152,6 @@ def {function}(*args, **kwargs):
         pass
         
         
-        
-        
-        
-        
 def test_exec(function_name):
     class FooTask(BaseTask):
         """Docstring"""
